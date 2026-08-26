@@ -1,0 +1,26 @@
+{
+  "name": "yeyu-jibei-remotion",
+  "version": "1.0.0",
+  "description": "《夜雨寄北》教学视频 Remotion 工程（第二部分逐句精读 + 第三部分情感地图）",
+  "scripts": {
+    "dev": "remotion studio src/index.ts --port=3000",
+    "preview": "remotion studio src/index.ts --port=3000",
+    "studio": "remotion studio src/index.ts --port=3000",
+    "build": "remotion render src/index.ts FullVideo out/video.mp4",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.280",
+    "@remotion/paths": "^4.0.280",
+    "@remotion/shapes": "^4.0.280",
+    "@remotion/transitions": "^4.0.280",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.280"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "typescript": "^5.7.3"
+  }
+}
