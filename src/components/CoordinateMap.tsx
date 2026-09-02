@@ -1,5 +1,5 @@
 import React from "react";
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { interpolate, useCurrentFrame } from "remotion";
 import { COORDINATE_POINTS, STYLE_TOKENS } from "../data/storyboardData";
 
 interface CoordinateMapProps {
@@ -7,6 +7,7 @@ interface CoordinateMapProps {
   visitedPointIds?: string[];
   showGrid?: boolean;
   highlightFold?: boolean;
+  foldProgress?: number; // 0 (start of Shot 12) to 1 (full resonance)
   size?: number;
   position?: { top: number; left: number };
   opacity?: number;
@@ -15,16 +16,15 @@ interface CoordinateMapProps {
 
 export const CoordinateMap: React.FC<CoordinateMapProps> = ({
   activePointIds,
-  visitedPointIds = [],
   showGrid = true,
   highlightFold = false,
+  foldProgress = 0,
   size = 680,
   position = { top: 180, left: 60 },
   opacity = 1,
   scale = 1,
 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
 
   const center = size / 2; // 340px
   const unit = 50; // 50px per unit
@@ -40,19 +40,17 @@ export const CoordinateMap: React.FC<CoordinateMapProps> = ({
 
   const pulse = interpolate(Math.sin(frame * 0.12), [-1, 1], [0.85, 1.25]);
 
-  // Smooth entrance spring for newly activated points in current sequence
-  const entranceProgress = spring({
-    frame,
-    fps,
-    config: { damping: 16, stiffness: 75 },
-  });
+  // Points coordinates
+  const p1 = mapToCanvas(COORDINATE_POINTS["1"].x, COORDINATE_POINTS["1"].y); // cx: 490, cy: 440
+  const p2 = mapToCanvas(COORDINATE_POINTS["2"].x, COORDINATE_POINTS["2"].y); // cx: 540, cy: 540
+  const p3 = mapToCanvas(COORDINATE_POINTS["3"].x, COORDINATE_POINTS["3"].y); // cx: 190, cy: 190
+  const p4Scene = mapToCanvas(COORDINATE_POINTS["4_scene"].x, COORDINATE_POINTS["4_scene"].y); // cx: 190, cy: 240
+  const p4Topic = mapToCanvas(COORDINATE_POINTS["4_topic"].x, COORDINATE_POINTS["4_topic"].y); // cx: 540, cy: 540
 
-  const smoothOpacity = interpolate(frame, [0, 20], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  // Total Euclidean distance between 4_scene and 4_topic for line drawing animation
+  const foldLineLength = Math.hypot(p4Topic.cx - p4Scene.cx, p4Topic.cy - p4Scene.cy);
 
-  // Strict collision-free floating text positioning directly ABOVE or BELOW points
+  // Floating text label config
   const getFloatingVerseConfig = (id: string, cx: number, cy: number) => {
     switch (id) {
       case "1":
@@ -60,35 +58,35 @@ export const CoordinateMap: React.FC<CoordinateMapProps> = ({
           title: "① 君问归期未有期",
           textAnchor: "middle" as const,
           tx: cx,
-          ty: cy - 26, // Directly ABOVE Point 1 (y: 414px)
+          ty: cy - 26,
         };
       case "2":
         return {
           title: "② 巴山夜雨涨秋池",
           textAnchor: "middle" as const,
           tx: cx,
-          ty: cy - 26, // Directly ABOVE Point 2 (y: 514px)
+          ty: cy - 26,
         };
       case "3":
         return {
           title: "③ 何当共剪西窗烛",
           textAnchor: "middle" as const,
           tx: cx,
-          ty: cy + 40, // Directly BELOW Point 3 (y: 230px)
+          ty: cy - 26,
         };
       case "4_scene":
         return {
-          title: "④ 场景 · 西窗将来 (+3)",
+          title: foldProgress > 0.4 ? "④ 场景 · 西窗将来 (+3)" : "④ 却话巴山夜雨时",
           textAnchor: "middle" as const,
           tx: cx,
-          ty: cy - 26, // Directly ABOVE Scene Point (y: 214px)
+          ty: cy + 36, // Placed cleanly below Point 4
         };
       case "4_topic":
         return {
           title: "④ 话题 · 巴山此刻 (-4)",
-          textAnchor: "middle" as const,
+          textAnchor: "middle" as const, // Centered directly under the point
           tx: cx,
-          ty: cy - 26, // Directly ABOVE Topic Point (y: 514px)
+          ty: cy + 36, // Placed below the point
         };
       default:
         return {
@@ -99,6 +97,14 @@ export const CoordinateMap: React.FC<CoordinateMapProps> = ({
         };
     }
   };
+
+  // Determine base rendering points: Points 1, 2, 3, 4_scene are always present
+  const basePoints = [
+    COORDINATE_POINTS["1"],
+    COORDINATE_POINTS["2"],
+    COORDINATE_POINTS["3"],
+    COORDINATE_POINTS["4_scene"],
+  ];
 
   return (
     <div
@@ -112,9 +118,15 @@ export const CoordinateMap: React.FC<CoordinateMapProps> = ({
         transform: `scale(${scale})`,
         transformOrigin: "center center",
         pointerEvents: "none",
+        overflow: "visible",
       }}
     >
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        style={{ overflow: "visible" }}
+      >
         <defs>
           <filter id="pointGlow" x="-60%" y="-60%" width="220%" height="220%">
             <feGaussianBlur stdDeviation="7" result="blur" />
@@ -124,7 +136,7 @@ export const CoordinateMap: React.FC<CoordinateMapProps> = ({
             </feMerge>
           </filter>
 
-          {/* High-Contrast Classical Text Halo Filter (Zero Dirty Glass Box) */}
+          {/* High-Contrast Classical Text Halo Filter */}
           <filter id="floatingTextGlow" x="-30%" y="-30%" width="160%" height="160%">
             <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.98" />
             <feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#000000" floodOpacity="0.95" />
@@ -255,24 +267,22 @@ export const CoordinateMap: React.FC<CoordinateMapProps> = ({
           巴山此刻 (+5) →
         </text>
 
-        {/* Connecting breathing dashed line for fold points in Shot 12 */}
-        {highlightFold && (
+        {/* 4. Spatiotemporal Fold Line: Smooth Progressive Laser Growth */}
+        {highlightFold && foldProgress > 0 && (
           <g>
             {(() => {
-              const pScene = mapToCanvas(COORDINATE_POINTS["4_scene"].x, COORDINATE_POINTS["4_scene"].y);
-              const pTopic = mapToCanvas(COORDINATE_POINTS["4_topic"].x, COORDINATE_POINTS["4_topic"].y);
-              const dashOffset = (frame * 2.2) % 32;
+              const dashOffset = (1 - foldProgress) * foldLineLength + ((frame * 2.2) % 32);
               return (
                 <line
-                  x1={pScene.cx}
-                  y1={pScene.cy}
-                  x2={pTopic.cx}
-                  y2={pTopic.cy}
+                  x1={p4Scene.cx}
+                  y1={p4Scene.cy}
+                  x2={p4Topic.cx}
+                  y2={p4Topic.cy}
                   stroke="#fb8500"
                   strokeWidth="3.5"
                   strokeDasharray="9,6"
                   strokeDashoffset={dashOffset}
-                  opacity={interpolate(Math.sin(frame * 0.2), [-1, 1], [0.55, 1])}
+                  opacity={foldProgress * interpolate(Math.sin(frame * 0.2), [-1, 1], [0.65, 1])}
                   filter="url(#pointGlow)"
                 />
               );
@@ -280,26 +290,24 @@ export const CoordinateMap: React.FC<CoordinateMapProps> = ({
           </g>
         )}
 
-        {/* 4. Progressive Cumulative Points & Standalone Pure Floating Glow Text */}
-        {Object.values(COORDINATE_POINTS).map((pt) => {
+        {/* 5. Base 4 Points Rendering */}
+        {basePoints.map((pt) => {
           const isActive = activePointIds.includes(pt.id);
-          const isVisited = visitedPointIds.includes(pt.id);
-
-          // Only render if active currently or previously visited!
-          if (!isActive && !isVisited) return null;
-
           const { cx, cy } = mapToCanvas(pt.x, pt.y);
           const tag = getFloatingVerseConfig(pt.id, cx, cy);
 
-          // Active point gets smooth spring scale and dynamic pulse
-          const pointScale = isActive
-            ? 12 * Math.max(0.7, entranceProgress)
-            : 7;
+          const pointRadius = isActive ? 12 : 7;
+          let pointOpacity = isActive ? 1 : 0.38;
 
-          const currentOpacity = isActive ? smoothOpacity : 0.45;
+          // When fold is emerging in Shot 12, smoothly fade out Point 2's dimmed label so it doesn't clash with 4_topic
+          if (pt.id === "2" && foldProgress > 0) {
+            pointOpacity = Math.max(0, 0.38 * (1 - foldProgress * 1.5));
+          }
+
+          if (pointOpacity <= 0.01) return null;
 
           return (
-            <g key={pt.id} opacity={currentOpacity}>
+            <g key={pt.id} opacity={pointOpacity}>
               {/* Outer Pulsing Aura Ring (Only for current active point) */}
               {isActive && (
                 <circle
@@ -309,7 +317,7 @@ export const CoordinateMap: React.FC<CoordinateMapProps> = ({
                   fill="none"
                   stroke={pt.color}
                   strokeWidth="2.5"
-                  opacity={0.75}
+                  opacity={0.85}
                   filter="url(#pointGlow)"
                 />
               )}
@@ -318,29 +326,94 @@ export const CoordinateMap: React.FC<CoordinateMapProps> = ({
               <circle
                 cx={cx}
                 cy={cy}
-                r={pointScale}
+                r={pointRadius}
                 fill={pt.color}
-                filter="url(#pointGlow)"
+                stroke={isActive ? "#ffffff" : pt.color}
+                strokeWidth={isActive ? 1.5 : 1}
+                filter={isActive ? "url(#pointGlow)" : undefined}
               />
 
-              {/* Small Inner Bright Spark */}
+              {/* Small Inner Bright Spark (Active only) */}
               {isActive && (
                 <circle
                   cx={cx}
                   cy={cy}
                   r={4}
                   fill="#ffffff"
-                  opacity={0.9}
+                  opacity={0.95}
                 />
               )}
 
-              {/* Pure Floating Verse Calligraphy Text (Directly Above/Below Point, 50% Bigger) */}
+              {/* Pure Floating Verse Calligraphy Text */}
               <text
                 x={tag.tx}
                 y={tag.ty}
                 textAnchor={tag.textAnchor}
-                fill={isActive ? "#ffffff" : "rgba(255, 255, 255, 0.6)"}
-                fontSize={isActive ? "28" : "24"}
+                fill={isActive ? "#ffffff" : "rgba(226, 232, 240, 0.45)"}
+                fontSize={isActive ? "28" : "23"}
+                fontFamily={STYLE_TOKENS.fontKai}
+                fontWeight={isActive ? "bold" : "normal"}
+                letterSpacing="2.2"
+                filter={isActive ? "url(#floatingTextGlow)" : "drop-shadow(0 2px 4px rgba(0,0,0,0.8))"}
+              >
+                {tag.title}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* 6. Spatiotemporal Fold Second Coordinate (Point 4_topic): Progressive Awakening */}
+        {highlightFold && foldProgress > 0.05 && (() => {
+          const pt = COORDINATE_POINTS["4_topic"];
+          const tag = getFloatingVerseConfig(pt.id, p4Topic.cx, p4Topic.cy);
+          const topicOpacity = Math.min(1, foldProgress * 1.2);
+          const topicScale = interpolate(foldProgress, [0, 1], [0.3, 1]);
+
+          return (
+            <g
+              key="4_topic_awakening"
+              opacity={topicOpacity}
+              transform={`matrix(${topicScale} 0 0 ${topicScale} ${(1 - topicScale) * p4Topic.cx} ${(1 - topicScale) * p4Topic.cy})`}
+            >
+              {/* Outer Pulsing Aura Ring */}
+              <circle
+                cx={p4Topic.cx}
+                cy={p4Topic.cy}
+                r={28 * pulse}
+                fill="none"
+                stroke={pt.color}
+                strokeWidth="2.5"
+                opacity={0.85 * topicOpacity}
+                filter="url(#pointGlow)"
+              />
+
+              {/* Glowing Point Core Body */}
+              <circle
+                cx={p4Topic.cx}
+                cy={p4Topic.cy}
+                r={12}
+                fill={pt.color}
+                stroke="#ffffff"
+                strokeWidth={1.5}
+                filter="url(#pointGlow)"
+              />
+
+              {/* Inner Bright Spark */}
+              <circle
+                cx={p4Topic.cx}
+                cy={p4Topic.cy}
+                r={4}
+                fill="#ffffff"
+                opacity={0.95}
+              />
+
+              {/* Floating Topic Label: Fully visible, right aligned inside canvas, below the point */}
+              <text
+                x={tag.tx}
+                y={tag.ty}
+                textAnchor={tag.textAnchor}
+                fill="#ffffff"
+                fontSize="28"
                 fontFamily={STYLE_TOKENS.fontKai}
                 fontWeight="bold"
                 letterSpacing="2.2"
@@ -350,7 +423,7 @@ export const CoordinateMap: React.FC<CoordinateMapProps> = ({
               </text>
             </g>
           );
-        })}
+        })()}
       </svg>
     </div>
   );

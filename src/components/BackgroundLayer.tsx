@@ -14,6 +14,8 @@ import {
 interface BackgroundLayerProps {
   theme: "cold" | "warm" | "spatiotemporal-fold" | "full-map";
   shotNumber: number;
+  imageSrc?: string;
+  overlayImageSrc?: string;
   videoSrc?: string;
   overlayVideoSrc?: string;
   overlayOpacity?: number;
@@ -21,11 +23,89 @@ interface BackgroundLayerProps {
   overlayVideoMode?: "loop-slow" | "time-remap-s11" | "freeze-last" | "custom-rate" | "crossfade-loop-2x";
   customPlaybackRate?: number;
   volume?: number | ((frame: number) => number);
+  kenBurns?: {
+    startScale?: number;
+    endScale?: number;
+    startTranslateX?: number;
+    endTranslateX?: number;
+    startTranslateY?: number;
+    endTranslateY?: number;
+  };
 }
+
+const CrossfadeVideoItem: React.FC<{
+  videoSrc: string;
+  videoLength: number;
+  overlap: number;
+  isFirst: boolean;
+  volume: number;
+}> = ({ videoSrc, videoLength, overlap, isFirst, volume }) => {
+  const frame = useCurrentFrame();
+  let opacity = 1;
+  if (!isFirst) {
+    opacity = interpolate(frame, [0, overlap], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+  }
+  const fadeOut = interpolate(frame, [videoLength - overlap, videoLength], [1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  opacity = Math.min(opacity, fadeOut);
+
+  return (
+    <OffthreadVideo
+      src={videoSrc}
+      playbackRate={1}
+      volume={volume}
+      style={{
+        position: "absolute",
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        opacity: opacity * 0.85,
+      }}
+    />
+  );
+};
+
+const CrossfadeLoopVideo: React.FC<{
+  videoSrc: string;
+  durationInFrames: number;
+  videoLength?: number;
+  overlap?: number;
+  volume: number;
+}> = ({ videoSrc, durationInFrames, videoLength = 224, overlap = 45, volume }) => {
+  const step = videoLength - overlap;
+  const count = Math.ceil(durationInFrames / step) + 1;
+
+  return (
+    <AbsoluteFill>
+      {Array.from({ length: count }).map((_, i) => {
+        const start = i * step;
+        if (start >= durationInFrames) return null;
+        return (
+          <Sequence key={i} from={start} durationInFrames={videoLength}>
+            <CrossfadeVideoItem
+              videoSrc={videoSrc}
+              videoLength={videoLength}
+              overlap={overlap}
+              isFirst={i === 0}
+              volume={volume}
+            />
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
 
 export const BackgroundLayer: React.FC<BackgroundLayerProps> = ({
   theme,
   shotNumber,
+  imageSrc,
+  overlayImageSrc,
   videoSrc,
   overlayVideoSrc,
   overlayOpacity = 0.45,
@@ -33,6 +113,7 @@ export const BackgroundLayer: React.FC<BackgroundLayerProps> = ({
   overlayVideoMode = "loop-slow",
   customPlaybackRate = 1,
   volume = 1,
+  kenBurns,
 }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
@@ -45,16 +126,38 @@ export const BackgroundLayer: React.FC<BackgroundLayerProps> = ({
   const candlePulse = interpolate(
     Math.sin(frame * 0.12) + Math.cos(frame * 0.07),
     [-2, 2],
-    [0.88, 1.12]
+    [0.92, 1.08]
   );
-  const rainOffset = (frame * 16) % 800;
-  const mistOffset = interpolate(frame, [0, 600], [0, 180]);
-  const waterLevel = interpolate(
-    frame,
-    [0, 390],
-    shotNumber === 10 ? [0, 38] : [0, 0],
-    { extrapolateRight: "clamp" }
-  );
+
+  // Ken Burns subtle camera motion for static images
+  const scale = kenBurns
+    ? interpolate(
+        frame,
+        [0, durationInFrames],
+        [kenBurns.startScale ?? 1, kenBurns.endScale ?? 1.03],
+        { extrapolateRight: "clamp" }
+      )
+    : interpolate(frame, [0, durationInFrames], [1, 1.025], {
+        extrapolateRight: "clamp",
+      });
+
+  const translateX = kenBurns?.startTranslateX !== undefined
+    ? interpolate(
+        frame,
+        [0, durationInFrames],
+        [kenBurns.startTranslateX, kenBurns.endTranslateX ?? kenBurns.startTranslateX],
+        { extrapolateRight: "clamp" }
+      )
+    : 0;
+
+  const translateY = kenBurns?.startTranslateY !== undefined
+    ? interpolate(
+        frame,
+        [0, durationInFrames],
+        [kenBurns.startTranslateY, kenBurns.endTranslateY ?? kenBurns.startTranslateY],
+        { extrapolateRight: "clamp" }
+      )
+    : 0;
 
   return (
     <AbsoluteFill
@@ -63,6 +166,48 @@ export const BackgroundLayer: React.FC<BackgroundLayerProps> = ({
         overflow: "hidden",
       }}
     >
+      {/* 1. Base Image Layer with subtle cinematic Ken Burns motion */}
+      {imageSrc && (
+        <AbsoluteFill
+          style={{
+            transform: `scale(${scale}) translate(${translateX}px, ${translateY}px)`,
+            transformOrigin: "center center",
+          }}
+        >
+          <Img
+            src={imageSrc}
+            style={{
+              position: "absolute",
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              opacity: 0.9,
+            }}
+          />
+        </AbsoluteFill>
+      )}
+
+      {/* 1b. Overlay Image Layer (e.g. for Double Exposure / Spatiotemporal Fold) */}
+      {overlayImageSrc && (
+        <AbsoluteFill
+          style={{
+            opacity: overlayOpacity,
+            mixBlendMode: theme === "spatiotemporal-fold" ? "screen" : "normal",
+            transform: `scale(${scale}) translate(${translateX}px, ${translateY}px)`,
+            transformOrigin: "center center",
+          }}
+        >
+          <Img
+            src={overlayImageSrc}
+            style={{
+              position: "absolute",
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+        </AbsoluteFill>
+      )}
       {/* 1. Base Video Layer with Looping, Slow Motion, or Freeze */}
       {videoSrc && baseVideoMode === "loop-slow" && (
         <Loop durationInFrames={300}>
@@ -80,50 +225,15 @@ export const BackgroundLayer: React.FC<BackgroundLayerProps> = ({
           />
         </Loop>
       )}
-      {videoSrc && baseVideoMode === "crossfade-loop-2x" && (() => {
-        // Tile the video at 1x speed. Assuming video is 300 frames (10s) long.
-        // Overlap by 60 frames (2s) to ensure audio and video are perfectly continuous.
-        // A new video starts every 240 frames (8s), solving the audio cutout issue.
-        const L = 300;
-        const O = 60;
-        const step = L - O; // 240 frames
-        const count = Math.ceil(durationInFrames / step);
-
-        return (
-          <AbsoluteFill>
-            {Array.from({ length: count }).map((_, i) => {
-              const start = i * step;
-              return (
-                <Sequence key={i} from={start} durationInFrames={L}>
-                  <AbsoluteFill
-                    style={{
-                      opacity: interpolate(
-                        frame,
-                        [start, start + O, start + L - O, start + L],
-                        [i === 0 ? 1 : 0, 1, 1, 0],
-                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-                      ),
-                    }}
-                  >
-                    <OffthreadVideo
-                      src={videoSrc}
-                      playbackRate={1}
-                      volume={safeVolume}
-                      style={{
-                        position: "absolute",
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        opacity: 0.85,
-                      }}
-                    />
-                  </AbsoluteFill>
-                </Sequence>
-              );
-            })}
-          </AbsoluteFill>
-        );
-      })()}
+      {videoSrc && baseVideoMode === "crossfade-loop-2x" && (
+        <CrossfadeLoopVideo
+          videoSrc={videoSrc}
+          durationInFrames={durationInFrames}
+          videoLength={224}
+          overlap={45}
+          volume={safeVolume}
+        />
+      )}
       {videoSrc && baseVideoMode === "time-remap-s11" && (
         <AbsoluteFill>
           <Sequence from={0} durationInFrames={150}>

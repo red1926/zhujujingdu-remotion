@@ -10,6 +10,8 @@ const Shot13Sequence: React.FC = () => {
       <BackgroundLayer
         theme="full-map"
         shotNumber={13}
+        imageSrc={staticFile("分镜首尾帧/夜雨时空.jpg")}
+        kenBurns={{ startScale: 1.0, endScale: 1.02 }}
       />
       <PoeticFullMap shotNumber={13} />
     </AbsoluteFill>
@@ -22,6 +24,8 @@ const Shot14Sequence: React.FC = () => {
       <BackgroundLayer
         theme="full-map"
         shotNumber={14}
+        imageSrc={staticFile("分镜首尾帧/夜雨时空.jpg")}
+        kenBurns={{ startScale: 1.02, endScale: 1.04 }}
       />
       <PoeticFullMap shotNumber={14} />
     </AbsoluteFill>

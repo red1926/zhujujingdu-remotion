@@ -6,7 +6,10 @@
     "dev": "remotion studio src/index.ts --port=3000",
     "preview": "remotion studio src/index.ts --port=3000",
     "studio": "remotion studio src/index.ts --port=3000",
-    "build": "remotion render src/index.ts FullVideo out/video.mp4",
+    "build": "remotion render src/index.ts FullVideo out/FullVideo.mp4",
+    "render:part2": "remotion render src/index.ts Part2-DetailedReading out/Part2_DetailedReading.mp4",
+    "render:part3": "remotion render src/index.ts Part3-PoeticMap out/Part3_PoeticMap.mp4",
+    "render:full": "remotion render src/index.ts FullVideo out/FullVideo.mp4",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -21,6 +24,7 @@
   "devDependencies": {
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "docx": "^9.7.1",
     "typescript": "^5.7.3"
   }
 }
