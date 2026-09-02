@@ -1,21 +1,26 @@
 import React from "react";
-import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import { CoordinateMap } from "./CoordinateMap";
 import { CalligraphyVerse } from "./CalligraphyVerse";
 
 export const SpatiotemporalFold: React.FC = () => {
   const frame = useCurrentFrame();
 
-  // Dual coordinates appear strictly when analyzing the fold (at frame >= 60 / 2 seconds into S12)
-  const showDual = frame >= 60;
+  // Dual coordinates appear strictly when analyzing the fold (at frame >= 45)
+  const showDual = frame >= 45;
+  const foldProgress = interpolate(frame, [45, 85], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
 
   return (
     <AbsoluteFill>
       {/* Left side: Coordinate Map transitioning into pure dual coordinates */}
       <CoordinateMap
-        activePointIds={showDual ? ["4_scene", "4_topic"] : ["3"]}
-        visitedPointIds={showDual ? ["4_scene", "4_topic"] : ["1", "2", "3"]}
+        currentVerseIndex={4}
+        localVerseFrame={frame}
         highlightFold={showDual}
+        foldProgress={foldProgress}
         size={680}
         position={{ top: 180, left: 60 }}
       />
@@ -35,10 +40,11 @@ export const SpatiotemporalFold: React.FC = () => {
         }}
       >
         <CalligraphyVerse
+          stageTag="【第 4 句 · 时空重影】"
           verse="却话巴山夜雨时"
-          voiceover="西窗仍然在，但巴山的雨从烛光里浮现了——将来的人，在回忆此刻的夜雨。一个点容纳不了两层时空。"
+          evidence="一个现在，被带进了将来。"
+          subEvidence="双重时空在此重合，单点坐标失效"
           theme="spatiotemporal-fold"
-          note={showDual ? "◎ 时空重影结构 · 双重坐标共振" : "④ 诗境精读 · 终极高潮"}
         />
       </div>
     </AbsoluteFill>

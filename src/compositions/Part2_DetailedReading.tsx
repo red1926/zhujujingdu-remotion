@@ -106,44 +106,46 @@ export const Part2_DetailedReading: React.FC = () => {
   const bg12Start = 1425;
   const bg12Duration = 465 + 15; // 1425 to 1905
 
-  // Determine active coordinate points directly from the continuous Part 2 timeline
-  let activePointIds: string[] = [];
+  // Determine current active verse index and local frame within that verse
+  let currentVerseIndex = 0;
+  let localVerseFrame = 0;
   let highlightFold = false;
   let foldProgress = 0;
 
   if (frame < 300) {
-    // Shot 8 (0 - 300): All 4 points appear in dark/dimmed state, none active
-    activePointIds = [];
+    // Shot 8 (0 - 300): AI退场，只有坐标系框架，无点
+    currentVerseIndex = 0;
+    localVerseFrame = frame;
     highlightFold = false;
     foldProgress = 0;
   } else if (frame < 690) {
-    // Shot 9 (300 - 690): First verse active
-    activePointIds = ["1"];
+    // Shot 9 (300 - 690): 第1句，点1下沉
+    currentVerseIndex = 1;
+    localVerseFrame = frame - 300;
     highlightFold = false;
     foldProgress = 0;
   } else if (frame < 1065) {
-    // Shot 10 (690 - 1065): Second verse active
-    activePointIds = ["2"];
+    // Shot 10 (690 - 1065): 第2句，点2沉到底部
+    currentVerseIndex = 2;
+    localVerseFrame = frame - 690;
     highlightFold = false;
     foldProgress = 0;
   } else if (frame < 1440) {
-    // Shot 11 (1065 - 1440): Third verse active
-    activePointIds = ["3"];
+    // Shot 11 (1065 - 1440): 第3句，点3跨越跃升至西窗
+    currentVerseIndex = 3;
+    localVerseFrame = frame - 1065;
     highlightFold = false;
     foldProgress = 0;
   } else {
-    // Shot 12 (1440 - 1905): Fourth verse / Spatiotemporal Fold
-    const localShot12 = frame - 1440;
-    activePointIds = ["4_scene"];
-    if (localShot12 >= 45) {
+    // Shot 12 (1440 - 1905): 第4句，双坐标时空重影 / 规则断裂
+    currentVerseIndex = 4;
+    localVerseFrame = frame - 1440;
+    if (localVerseFrame >= 45) {
       highlightFold = true;
-      foldProgress = interpolate(localShot12, [45, 80], [0, 1], {
+      foldProgress = interpolate(localVerseFrame, [45, 85], [0, 1], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
       });
-      if (foldProgress > 0.05) {
-        activePointIds = ["4_scene", "4_topic"];
-      }
     }
   }
 
@@ -195,11 +197,12 @@ export const Part2_DetailedReading: React.FC = () => {
       </AbsoluteFill>
 
       {/* =========================================================================
-          LAYER 2: PERSISTENT CONTINUOUS COORDINATE MAP (Never Remounts / Zero Flashing)
+          LAYER 2: PERSISTENT CONTINUOUS COORDINATE MAP (Dynamic Trajectories)
           ========================================================================= */}
       <AbsoluteFill style={{ zIndex: 10 }}>
         <CoordinateMap
-          activePointIds={activePointIds}
+          currentVerseIndex={currentVerseIndex}
+          localVerseFrame={localVerseFrame}
           highlightFold={highlightFold}
           foldProgress={foldProgress}
           size={680}
@@ -209,7 +212,7 @@ export const Part2_DetailedReading: React.FC = () => {
       </AbsoluteFill>
 
       {/* =========================================================================
-          LAYER 3: RIGHT-SIDE CALLIGRAPHY VERSE & COMMENTARY CARDS
+          LAYER 3: RIGHT-SIDE CALLIGRAPHY VERSE & EVIDENCE (Distinct Pedagogical Hierarchy)
           ========================================================================= */}
       <AbsoluteFill style={{ zIndex: 20 }}>
         {/* Shot 8: 序幕 (0 - 300f) */}
@@ -225,15 +228,15 @@ export const Part2_DetailedReading: React.FC = () => {
             }}
           >
             <CalligraphyVerse
+              stageTag="【逐句精读序幕】"
               verse="AI已退场 · 回到诗境"
-              voiceover={shot8.voiceover}
+              evidence="现在，让我们回到诗本身，逐句看。"
               theme={shot8.theme}
-              note="逐句精读序幕"
             />
           </div>
         </Sequence>
 
-        {/* Shot 9: 第一句 (300 - 690f) */}
+        {/* Shot 9: 第一句 (300 - 690f) —— 层级一：确认现实 · 建立读图 */}
         <Sequence from={300} durationInFrames={390}>
           <div
             style={{
@@ -246,15 +249,16 @@ export const Part2_DetailedReading: React.FC = () => {
             }}
           >
             <CalligraphyVerse
-              verse={shot9.verse || "君问归期未有期"}
-              voiceover={shot9.voiceover}
+              stageTag="【第 1 句 · 确认现实】"
+              verse="君问归期未有期"
+              evidence="归期未定，现实仍停在巴山。"
+              subEvidence="诗意落点：① 巴山 · 此刻"
               theme={shot9.theme}
-              note="① 现实现在 · 孤寂沉郁 (-2)"
             />
           </div>
         </Sequence>
 
-        {/* Shot 10: 第二句 (690 - 1065f) */}
+        {/* Shot 10: 第二句 (690 - 1065f) —— 层级二：同向加深 · 情感下沉 */}
         <Sequence from={690} durationInFrames={375}>
           <div
             style={{
@@ -267,15 +271,16 @@ export const Part2_DetailedReading: React.FC = () => {
             }}
           >
             <CalligraphyVerse
-              verse={shot10.verse || "巴山夜雨涨秋池"}
-              voiceover={shot10.voiceover}
+              stageTag="【第 2 句 · 情绪加深】"
+              verse="巴山夜雨涨秋池"
+              evidence="现实没有离开，情绪却继续下沉。"
+              subEvidence="诗意落点：② 沉到底部"
               theme={shot10.theme}
-              note="② 现实现在 · 夜雨涨池 (-4)"
             />
           </div>
         </Sequence>
 
-        {/* Shot 11: 第三句 (1065 - 1440f) */}
+        {/* Shot 11: 第三句 (1065 - 1440f) —— 层级三：解释退出主视觉，聚焦西窗与大跃升 */}
         <Sequence from={1065} durationInFrames={375}>
           <div
             style={{
@@ -288,33 +293,50 @@ export const Part2_DetailedReading: React.FC = () => {
             }}
           >
             <CalligraphyVerse
-              verse={shot11.verse || "何当共剪西窗烛"}
-              voiceover={shot11.voiceover}
+              stageTag="【第 3 句 · 跨越跃升】"
+              verse="何当共剪西窗烛"
+              evidence="从现实滑向想象。"
+              subEvidence="诗意落点：③ 西窗 · 将来"
               theme={shot11.theme}
-              note="③ 想象将来 · 温暖期待 (+3)"
+              subdued={true}
             />
           </div>
         </Sequence>
 
-        {/* Shot 12: 第四句 / 时空折叠 (1440 - 1905f) */}
+        {/* Shot 12: 第四句 / 时空折叠 (1440 - 1905f) —— 层级四：前3.5秒无文字，随后浮现终极诗性结语 */}
         <Sequence from={1440} durationInFrames={465}>
-          <div
-            style={{
-              position: "absolute",
-              top: "50%",
-              transform: "translateY(-50%)",
-              left: 960,
-              right: 70,
-              pointerEvents: "none",
-            }}
-          >
-            <CalligraphyVerse
-              verse={shot12.verse || "却话巴山夜雨时"}
-              voiceover={shot12.voiceover}
-              theme={shot12.theme}
-              note={highlightFold ? "◎ 时空重影结构 · 双重坐标共振" : "④ 逐句精读 · 终极高潮"}
-            />
-          </div>
+          {(() => {
+            const localShot12 = frame - 1440;
+            // First 105 frames (3.5s): Hide card to give full visual stage to the double exposure & dual points
+            const cardFadeIn = interpolate(localShot12, [95, 125], [0, 1], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            });
+
+            if (cardFadeIn <= 0.01) return null;
+
+            return (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  left: 960,
+                  right: 70,
+                  opacity: cardFadeIn,
+                  pointerEvents: "none",
+                }}
+              >
+                <CalligraphyVerse
+                  stageTag="【第 4 句 · 时空重影】"
+                  verse="却话巴山夜雨时"
+                  evidence="一个现在，被带进了将来。"
+                  subEvidence="双重时空在此重合，单点坐标失效"
+                  theme={shot12.theme}
+                />
+              </div>
+            );
+          })()}
         </Sequence>
       </AbsoluteFill>
     </AbsoluteFill>
